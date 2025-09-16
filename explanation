@@ -1,0 +1,177 @@
+how the model works 
+
+1) Scope & Defaults
+
+Session: RTH (FX = NY block analogue).
+
+Profile base: Volume at price (TPO used only for classification features).
+
+Price grid: fixed 1–2 ticks per session (bump to 2–3 if thin).
+
+Evaluation horizon: intraday only (overnight = context).
+
+Wavelet: MODWT db4, 3–4 levels.
+
+Smoothing (σ): measured in grid bins; bounds 1–4; updates require ≥10% relative change.
+
+MH fitting targets: acceptance 20–35%; simple Dirichlet prior for scale weights; log-normal/half-normal prior for σ.
+
+Covariance: EWMA with shrinkage; base half-life 5 min; bounds 2–10 min.
+
+2) Inputs (live)
+
+Per-trade: price, size → volume per price bin (raw profile).
+
+Bars (1–5s): returns, cumulative delta change, order-flow imbalance, depth imbalance, volume.
+
+References: prior VAH/VAL/POC, overnight high/low, ADR(20).
+
+Opening metrics: Opening Range (first 5m) break/re-entries, break-and-hold time, first test of VAH/VAL/VWAP/ONH/ONL and result (accept/reject), early flow persistence, VWAP slope and R², early rotation count.
+
+3) Context Layers (probabilities, never hard labels)
+
+Opening types (first 5–30m):
+Open-Drive, Open Test-Drive, Open Rejection-Reverse, Open Auction In-Range, Open Auction Out-of-Range.
+
+Day types (evolves through session):
+Trend, Normal, Neutral, Non-trend, Trend-Multi-Distribution.
+
+Mitigations (apply to both):
+
+Act only if max probability ≥ 0.60.
+
+Hysteresis: no flip unless probability changes by ≥ 0.15.
+
+Evidence-lock: if max probability < 0.50 → neutral behavior.
+
+Cooldown after flips: 3–5 bars.
+
+News window: cap opening-type influence to 20% and require stronger confirmations.
+
+Blend rule: opening-type can influence day-type by at most 40% during hour one, decays to 0 by midday unless evidence persists.
+
+4) Profile Engine (what we compute)
+
+Raw profile: volume per price bin (fixed grid).
+
+Wave/scale decomposition: split the profile into 3–4 scale components; each normalised to integrate to one.
+
+Scale mixture: combine components with non-negative weights that sum to one (the “composition”).
+
+Convolutional smoothing: smooth the mixture with a kernel; σ increases when small-scale noise is high and decreases in balance.
+
+Profile outputs (recomputed each refresh):
+
+Point of Control (mode of smoothed profile).
+
+Value Area (70% smallest interval).
+
+Tail mass up/down, Value-Area width.
+
+Bimodality index (peak separation vs local width).
+
+Scale weights and scale-entropy (how many scales actually matter).
+
+5) Bayesian Fitting (Metropolis–Hastings)
+
+Unknowns: scale weights and smoothing σ.
+
+Likelihood: discretised counts over price bins.
+
+Priors/adapters: adjusted by context probabilities with caps/hysteresis.
+
+Diagnostics: target acceptance 20–35%; check effective sample size; adapt proposal scale after burn-in.
+
+Deliverable: credible bands for POC, Value-Area edges, tails; posterior means for reporting.
+
+6) Covariance Panel (regime sanity check)
+
+Feature vector (keep ≤12): returns, delta change, OFI, depth imbalance, volume, scale weights, Value-Area width, upper/lower tail mass.
+
+Estimator: EWMA mean/cov with shrinkage.
+
+Signals: largest eigenvalue (market-mode clamp), key correlations (return vs upper-tail, return vs delta, OFI vs small-scale weight).
+
+Adapters: half-life shorter on drive/test-drive context; longer on auction in-range; bounds always enforced.
+
+7) Parameter Adapters (how context steers the model)
+
+Dirichlet weights: drive/test-drive → emphasize small-scale; auction in-range → emphasize mid-scale; out-of-range auction → allow more tail mass.
+
+Smoothing σ: nudged up in drive/test, down in auction; obey bounds and hysteresis.
+
+Covariance half-life: shorter in drive/test, longer in auction; obey bounds; more shrinkage when confidence is low.
+
+8) Visualisation (single study layout)
+
+Region 1 (main): price + smoothed profile histogram (opacity by density), POC line, Value-Area band, tails shaded, credible-band envelope; OR box; range-extension arrows; opening-type label with confidence; prior VAH/VAL/POC and ONH/ONL lines; small HUD (σ, top day-type with probability, half-life, lock/hysteresis state).
+
+Region 2: order-flow panel (your Numbers Bars/CVD); we mark absorption/sweep only at VAH/VAL/POC and first tests.
+
+Region 3: composition bar (scale weights), Value-Area width, bimodality, tail mass chips; probability bars for opening/day types.
+
+Region 4: largest-eigenvalue sparkline, mini-correlations, short event tape.
+
+Cadence: profile every 10–15s or 500–1000 ticks; covariance every 2–5s; flow markers live. Object budget capped; degrade gracefully (fewer density rows; hide credible-band shading) if needed.
+
+9) Decision Gates (for later trading tests)
+
+Fade Value-Area edges: only if Auction In-Range ≥ 0.60 and flow confirms (absorption/exhaustion).
+
+Go-with pullbacks: only if Drive/Test-Drive ≥ 0.60 and delta/OFI align.
+
+Tighter stops when fading into trend; looser in balance.
+
+10) Logging (per session)
+
+Opening position (inside value / in-range outside value / out-of-range), gap as %ADR, acceptance minutes.
+
+Opening-type probabilities and evidence (OR stats, first-test outcome, flow persistence, VWAP slope/R²).
+
+Day-type probabilities and features (IB%ADR, range extension, rotations, POC drift).
+
+Profile snapshots at 30/60/120 min (POC, Value-Area width, tails, bimodality, scale weights, scale-entropy).
+
+Covariance metrics timeline (largest eigenvalue, key correlations).
+
+Mitigation states (locks, hysteresis, cooldowns, news caps).
+
+11) Evaluation (pass/fail vs baseline)
+
+Compare to plain Volume Profile on the same RTH days:
+
+Hit-rate at VAH/VAL touches (when rules say act).
+
+MAE/MFE around entries.
+
+Time-to-resolve after level touch.
+
+Segment by opening type and day type.
+
+Null check with a queue-reactive simulator (does shape detection beat the null).
+
+12) Failure Modes & Seatbelts
+
+Head-fake opens: soft labels, hysteresis, evidence-lock, cooldown.
+
+Micro noise: σ bounds + hysteresis.
+
+Correlation whiplash: half-life bounds + shrinkage.
+
+Cross-product drift: volatility-scaled thresholds (z-scores, %ADR) and per-symbol calibration.
+
+13) Defaults (quick copy block)
+
+OR window 5 min; break-and-hold ≥ 10 min.
+
+Gap small < 0.25 ADR(20); large ≥ 0.50.
+
+IB%ADR “normal” 0.20–0.40; early one-sided extension ≥ 0.50×IB flags trend risk.
+
+Wave levels 3 (start) or 4; grid 1–2 ticks.
+
+σ bounds 1–4 bins; actionable probability ≥ 0.60; hysteresis ΔP ≥ 0.15; evidence-lock < 0.50; cooldown 3–5 bars.
+
+Covariance half-life base 5 min; bounds 2–10; shrinkage always on.
+
+Opening-type influence on day-type ≤ 40% hour-one; decays to 0 by midday.
