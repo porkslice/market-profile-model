@@ -1,0 +1,44 @@
+install guide 
+
+in sierra, know your data files foldergo to global settings - general settings - paths - data files folder (usually C:\SierraChart\Data).
+
+This folder will hold the bridge files:
+feed_bins.csv (Sierra → Python)
+feed_features.csv (Sierra → Python)
+results.csv (Python → Sierra)
+
+sierra side (acsil build)
+1.Open Sierra → Analysis → New/Open ACSIL File…
+2.Create a new file named sierra_chartmarketprofilemodel.cpp and paste the C++ study you got from me (the “Bayesian Profile – Bridge” scaffold).
+
+Build it: Analysis → Build Custom Studies DLL (or F7 → Build).
+  After success, the study appears as “Bayesian Profile – Bridge” (that’s the display name inside the code).
+  
+Add the study to your intraday RTH chart: Analysis → Studies → Add Custom Study.
+
+Chart settings:
+  Session Times: set to your RTH.
+  Advanced Settings 2 → Enable “Volume at Price Data” (must be ON).
+  
+Study inputs (good starting values):
+  Profile Grid Size: 2 ticks
+  Smoothing Sigma (bins): 2.0 (min 1, max 4)
+  Opening Range Minutes: 5
+  Refresh Seconds: 10
+  Output Subfolder: bayes (default)
+
+python sidecar 
+Save the Python script as pythonside_marketprofilemodel.py (any folder is fine)
+
+install dependents 
+python -m pip install numpy pandas pywavelets scikit-learn
+
+Edit the script: set DATA_DIR to your bayes folder, e.g.
+DATA_DIR = r"C:\SierraChart\Data\bayes"
+
+Run it:
+python pythonside_marketprofilemodel.py
+It watches the two feed files and writes results.csv back into the same folder.
+
+in sierra u should see posterior POC/VA (white) overlay the fallback POC/VA (teal/grey), plus a λmax line.
+
