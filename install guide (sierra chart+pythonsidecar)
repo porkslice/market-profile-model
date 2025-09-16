@@ -26,6 +26,9 @@ Study inputs (good starting values):
   Opening Range Minutes: 5
   Refresh Seconds: 10
   Output Subfolder: bayes (default)
+  Flow Lookback Bars at Levels: 10
+  Flow Imbalance Threshold (ratio): 1.8
+  Draw VA 50% Credible Band: ON
 
 python sidecar 
 Save the Python script as pythonside_marketprofilemodel.py (any folder is fine)
