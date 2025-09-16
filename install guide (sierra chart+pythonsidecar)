@@ -42,3 +42,7 @@ It watches the two feed files and writes results.csv back into the same folder.
 
 in sierra u should see posterior POC/VA (white) overlay the fallback POC/VA (teal/grey), plus a λmax line.
 
+turn on bid/ask tracking for flow markers 
+Chart → Chart Settings → Advanced Settings 2 → Volume at Price Data = ON (you already had this).
+Chart → Chart Settings → Advanced Settings 2 → set Intraday Data Storage Time Unit = 1 Tick (best accuracy).
+Optional but helpful: Numbers Bars Calculated Values study on the chart for sanity checks.
