@@ -49,3 +49,8 @@ turn on bid/ask tracking for flow markers
 Chart → Chart Settings → Advanced Settings 2 → Volume at Price Data = ON (you already had this).
 Chart → Chart Settings → Advanced Settings 2 → set Intraday Data Storage Time Unit = 1 Tick (best accuracy).
 Optional but helpful: Numbers Bars Calculated Values study on the chart for sanity checks.
+
+
+No flow markers? Ensure 1-Tick storage and Volume at Price Data are ON; give it 5–10 bars.
+No posterior overlays? Check results.csv is appending; if not, confirm DATA_DIR and that Excel/antivirus isn’t locking the CSVs.
+Weird prices? Verify the chart’s tick size and RTH session.
